@@ -24,79 +24,96 @@ import UIKit
 import RxSwift
 import RxCocoa
 import MapKit
+import CoreLocation
 
 class ViewController: UIViewController {
 
-  @IBOutlet weak var mapView: MKMapView!
-  @IBOutlet weak var mapButton: UIButton!
-  @IBOutlet weak var geoLocationButton: UIButton!
-  @IBOutlet weak var activityIndicator: UIActivityIndicatorView!
-  @IBOutlet weak var searchCityName: UITextField!
-  @IBOutlet weak var tempLabel: UILabel!
-  @IBOutlet weak var humidityLabel: UILabel!
-  @IBOutlet weak var iconLabel: UILabel!
-  @IBOutlet weak var cityNameLabel: UILabel!
+    @IBOutlet weak var mapView: MKMapView!
+    @IBOutlet weak var mapButton: UIButton!
+    @IBOutlet weak var geoLocationButton: UIButton!
+    @IBOutlet weak var activityIndicator: UIActivityIndicatorView!
+    @IBOutlet weak var searchCityName: UITextField!
+    @IBOutlet weak var tempLabel: UILabel!
+    @IBOutlet weak var humidityLabel: UILabel!
+    @IBOutlet weak var iconLabel: UILabel!
+    @IBOutlet weak var cityNameLabel: UILabel!
 
-  let bag = DisposeBag()
+    let bag = DisposeBag()
+    let locationManager = CLLocationManager()
 
-  override func viewDidLoad() {
-    super.viewDidLoad()
-    // Do any additional setup after loading the view, typically from a nib.
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        // Do any additional setup after loading the view, typically from a nib.
 
-    style()
-    let searchInput = searchCityName.rx.controlEvent(.editingDidEndOnExit).asObservable()
-        .map { self.searchCityName.text }
-        .filter { ($0 ?? "").characters.count > 0 }
+        // request permission app authorization
+        geoLocationButton.rx.tap
+            .subscribe(onNext: {_ in
+                self.locationManager.requestWhenInUseAuthorization()
+                self.locationManager.startUpdatingLocation()
+            })
+            .addDisposableTo(bag)
 
-    let search = searchInput.flatMap { text in
-        return ApiController.shared.currentWeather(city: text ?? "Error")
-          .catchErrorJustReturn(ApiController.Weather.dummy)
-      }
-      .asDriver(onErrorJustReturn: ApiController.Weather.dummy)
+        // test current location
+        locationManager.rx.didUpdateLocations
+            .subscribe(onNext: { location in
+                print(location)
+            })
+            .addDisposableTo(bag)
 
-    let running = Observable.from([searchInput.map{ _ in true }, search.map { _ in false }.asObservable()])
-    .merge()
-    .startWith(true)
-    .asDriver(onErrorJustReturn: false)
+        style()
+        let searchInput = searchCityName.rx.controlEvent(.editingDidEndOnExit).asObservable()
+            .map { self.searchCityName.text }
+            .filter { ($0 ?? "").characters.count > 0 }
 
-    running.skip(1)
-    .drive(activityIndicator.rx.isAnimating)
-    .addDisposableTo(bag)
+        let search = searchInput.flatMap { text in
+            return ApiController.shared.currentWeather(city: text ?? "Error")
+                .catchErrorJustReturn(ApiController.Weather.dummy)
+            }
+            .asDriver(onErrorJustReturn: ApiController.Weather.dummy)
 
-    running.drive(tempLabel.rx.isHidden).addDisposableTo(bag)
-    running.drive(iconLabel.rx.isHidden).addDisposableTo(bag)
-    running.drive(humidityLabel.rx.isHidden).addDisposableTo(bag)
-    running.drive(cityNameLabel.rx.isHidden).addDisposableTo(bag)
-  }
+        let running = Observable.from([searchInput.map{ _ in true }, search.map { _ in false }.asObservable()])
+            .merge()
+            .startWith(true)
+            .asDriver(onErrorJustReturn: false)
 
-  override func viewDidAppear(_ animated: Bool) {
-    super.viewDidAppear(animated)
-  }
+        running.skip(1)
+            .drive(activityIndicator.rx.isAnimating)
+            .addDisposableTo(bag)
 
-  override func viewDidLayoutSubviews() {
-    super.viewDidLayoutSubviews()
+        running.drive(tempLabel.rx.isHidden).addDisposableTo(bag)
+        running.drive(iconLabel.rx.isHidden).addDisposableTo(bag)
+        running.drive(humidityLabel.rx.isHidden).addDisposableTo(bag)
+        running.drive(cityNameLabel.rx.isHidden).addDisposableTo(bag)
+    }
 
-    Appearance.applyBottomLine(to: searchCityName)
-  }
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+    }
 
-  override var preferredStatusBarStyle: UIStatusBarStyle {
-    return .lightContent
-  }
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
 
-  override func didReceiveMemoryWarning() {
-    super.didReceiveMemoryWarning()
-    // Dispose of any resources that can be recreated.
-  }
+        Appearance.applyBottomLine(to: searchCityName)
+    }
 
-  // MARK: - Style
+    override var preferredStatusBarStyle: UIStatusBarStyle {
+        return .lightContent
+    }
 
-  private func style() {
-    view.backgroundColor = UIColor.aztec
-    searchCityName.textColor = UIColor.ufoGreen
-    tempLabel.textColor = UIColor.cream
-    humidityLabel.textColor = UIColor.cream
-    iconLabel.textColor = UIColor.cream
-    cityNameLabel.textColor = UIColor.cream
-  }
+    override func didReceiveMemoryWarning() {
+        super.didReceiveMemoryWarning()
+        // Dispose of any resources that can be recreated.
+    }
+
+    // MARK: - Style
+
+    private func style() {
+        view.backgroundColor = UIColor.aztec
+        searchCityName.textColor = UIColor.ufoGreen
+        tempLabel.textColor = UIColor.cream
+        humidityLabel.textColor = UIColor.cream
+        iconLabel.textColor = UIColor.cream
+        cityNameLabel.textColor = UIColor.cream
+    }
 }
 
