@@ -29,7 +29,7 @@ class RxCLLocationManagerDelegateProxy: DelegateProxy, CLLocationManagerDelegate
 
     class func setCurrentDelegate(_ delegate: AnyObject?, toObject object: AnyObject) {
         let locationManager: CLLocationManager = object as! CLLocationManager
-        locationManager.delegate = delegate as! CLLocationManagerDelegate
+        locationManager.delegate = delegate as? CLLocationManagerDelegate
     }
 
     class func currentDelegateFor(_ object: AnyObject) -> AnyObject? {
@@ -45,7 +45,7 @@ extension Reactive where Base: CLLocationManager {
 
     var didUpdateLocations: Observable<[CLLocation]> {
         return
-        delegate.methodInvoked(#selector(CLLocationManagerDelegate.locationManager(_:didUpdateLocations:)))
+            delegate.methodInvoked(#selector(CLLocationManagerDelegate.locationManager(_:didUpdateLocations:)))
             .map { parameters in
                 return parameters[1] as! [CLLocation]
         }
