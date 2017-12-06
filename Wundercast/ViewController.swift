@@ -43,35 +43,52 @@ class ViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        style()
         // Do any additional setup after loading the view, typically from a nib.
 
         // request permission app authorization
-        geoLocationButton.rx.tap
-            .subscribe(onNext: {_ in
+        let geoInput = geoLocationButton.rx.tap.asObservable()
+            .do(onNext: {
                 self.locationManager.requestWhenInUseAuthorization()
                 self.locationManager.startUpdatingLocation()
             })
-            .addDisposableTo(bag)
 
-        // test current location
-        locationManager.rx.didUpdateLocations
-            .subscribe(onNext: { location in
-                print(location)
-            })
-            .addDisposableTo(bag)
+        // 1. get current location
+        let currentLocation = locationManager.rx.didUpdateLocations
+            .map { locations in return locations[0] }
+            .filter { location in
+                return location.horizontalAccuracy < kCLLocationAccuracyHundredMeters
+        }
 
-        style()
+        let geoLocation = geoInput.flatMap {
+            return currentLocation.take(1)
+        }
+
+        let geoSearch = geoLocation.flatMap { location in
+            return ApiController.shared.currentWeather(lat: location.coordinate.latitude, lon: location.coordinate.longitude).catchErrorJustReturn(ApiController.Weather.dummy)
+        }
+
+        // 2. create search location
         let searchInput = searchCityName.rx.controlEvent(.editingDidEndOnExit).asObservable()
             .map { self.searchCityName.text }
             .filter { ($0 ?? "").characters.count > 0 }
 
-        let search = searchInput.flatMap { text in
-            return ApiController.shared.currentWeather(city: text ?? "Error")
-                .catchErrorJustReturn(ApiController.Weather.dummy)
-            }
+        let textSearch = searchInput.flatMap { text in
+            return
+            ApiController.shared.currentWeather(city: text ?? "Error")
+            .catchErrorJustReturn(ApiController.Weather.dummy)
+        }
+
+        // 3. merge location and text search
+        let search = Observable.from([geoSearch, textSearch])
+            .merge()
             .asDriver(onErrorJustReturn: ApiController.Weather.dummy)
 
-        let running = Observable.from([searchInput.map{ _ in true }, search.map { _ in false }.asObservable()])
+        let running = Observable.from([
+            searchInput.map{ _ in true },
+            geoInput.map { _ in true },
+            search.map { _ in false }.asObservable()
+            ])
             .merge()
             .startWith(true)
             .asDriver(onErrorJustReturn: false)
