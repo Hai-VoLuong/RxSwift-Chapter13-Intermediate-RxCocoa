@@ -84,6 +84,13 @@ class ViewController: UIViewController {
             .merge()
             .asDriver(onErrorJustReturn: ApiController.Weather.dummy)
 
+        // active mapButton
+        mapButton.rx.tap
+            .subscribe(onNext: {
+                self.mapView.isHidden = !self.mapView.isHidden
+            })
+            .addDisposableTo(bag)
+
         let running = Observable.from([
             searchInput.map{ _ in true },
             geoInput.map { _ in true },
