@@ -44,32 +44,29 @@ class ViewController: UIViewController {
     // Do any additional setup after loading the view, typically from a nib.
 
     style()
+    let searchInput = searchCityName.rx.controlEvent(.editingDidEndOnExit).asObservable()
+        .map { self.searchCityName.text }
+        .filter { ($0 ?? "").characters.count > 0 }
 
-    let search = searchCityName.rx.controlEvent(.editingDidEndOnExit).asObservable()
-      .map { self.searchCityName.text }
-      .filter { ($0 ?? "").characters.count > 0 }
-      .flatMap { text in
+    let search = searchInput.flatMap { text in
         return ApiController.shared.currentWeather(city: text ?? "Error")
           .catchErrorJustReturn(ApiController.Weather.dummy)
       }
       .asDriver(onErrorJustReturn: ApiController.Weather.dummy)
 
-    search.map { "\($0.temperature)° C" }
-      .drive(tempLabel.rx.text)
-      .addDisposableTo(bag)
+    let running = Observable.from([searchInput.map{ _ in true }, search.map { _ in false }.asObservable()])
+    .merge()
+    .startWith(true)
+    .asDriver(onErrorJustReturn: false)
 
-    search.map { $0.icon }
-      .drive(iconLabel.rx.text)
-      .addDisposableTo(bag)
+    running.skip(1)
+    .drive(activityIndicator.rx.isAnimating)
+    .addDisposableTo(bag)
 
-    search.map { "\($0.humidity)%" }
-      .drive(humidityLabel.rx.text)
-      .addDisposableTo(bag)
-
-    search.map { $0.cityName }
-      .drive(cityNameLabel.rx.text)
-      .addDisposableTo(bag)
-
+    running.drive(tempLabel.rx.isHidden).addDisposableTo(bag)
+    running.drive(iconLabel.rx.isHidden).addDisposableTo(bag)
+    running.drive(humidityLabel.rx.isHidden).addDisposableTo(bag)
+    running.drive(cityNameLabel.rx.isHidden).addDisposableTo(bag)
   }
 
   override func viewDidAppear(_ animated: Bool) {
