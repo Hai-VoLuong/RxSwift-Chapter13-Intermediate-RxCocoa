@@ -108,6 +108,23 @@ class ViewController: UIViewController {
         running.drive(iconLabel.rx.isHidden).addDisposableTo(bag)
         running.drive(humidityLabel.rx.isHidden).addDisposableTo(bag)
         running.drive(cityNameLabel.rx.isHidden).addDisposableTo(bag)
+
+        search.map {"\($0.temperature)° C"}.drive(tempLabel.rx.text).addDisposableTo(bag)
+        search.map {$0.icon}.drive(iconLabel.rx.text).addDisposableTo(bag)
+        search.map {"\($0.humidity)%"}.drive(humidityLabel.rx.text).addDisposableTo(bag)
+        search.map {$0.cityName}.drive(cityNameLabel.rx.text).addDisposableTo(bag)
+
+        locationManager.rx.didUpdateLocations.subscribe(onNext: { locations in
+                print(locations)
+            }).addDisposableTo(bag)
+
+        mapButton.rx.tap.subscribe(onNext: {
+                self.mapView.isHidden = !self.mapView.isHidden
+            }).addDisposableTo(bag)
+
+        mapView.rx.setDelegate(self).addDisposableTo(bag)
+
+        search.map {[$0.overlay()]}.drive(mapView.rx.overlays).addDisposableTo(bag)
     }
 
     override func viewDidAppear(_ animated: Bool) {
@@ -139,5 +156,16 @@ class ViewController: UIViewController {
         iconLabel.textColor = UIColor.cream
         cityNameLabel.textColor = UIColor.cream
     }
+}
+
+extension ViewController: MKMapViewDelegate {
+    func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
+        if let overlay = overlay as? ApiController.Weather.Overlay {
+            let overlayView = ApiController.Weather.OverlayView(overlay: overlay, overlayIcon: overlay.icon)
+            return overlayView
+        }
+        return MKOverlayRenderer()
+    }
+
 }
 
